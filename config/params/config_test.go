@@ -178,8 +178,53 @@ func TestMaxBlobsPerBlock(t *testing.T) {
 		slot := primitives.Slot(1) // Epoch 0
 		require.Equal(t, cfg.MaxBlobsPerBlock(slot), cfg.DeprecatedMaxBlobsPerBlock)
 	})
+
 }
 
+func TestMaxBlobsJumbled(t *testing.T) {
+	params.SetActiveTestCleanup(t, params.MainnetBeaconConfig)
+	cfg := params.MainnetConfig()
+	cfg.FuluForkEpoch = cfg.ElectraForkEpoch + 4098*2
+	electraMaxBlobs := uint64(cfg.DeprecatedMaxBlobsPerBlockElectra)
+	offsets := []primitives.Epoch{cfg.FuluForkEpoch}
+	for _, offset := range []primitives.Epoch{320, 640, 960, 1080} {
+		offsets = append(offsets, cfg.FuluForkEpoch+offset)
+	}
+	maxBlobs := map[primitives.Epoch]uint64{
+		cfg.FuluForkEpoch: electraMaxBlobs,
+		offsets[0]:        electraMaxBlobs + 3,
+		offsets[1]:        electraMaxBlobs + 6,
+		offsets[2]:        electraMaxBlobs + 9,
+		offsets[3]:        electraMaxBlobs + 12,
+	}
+	schedule := make([]params.BlobScheduleEntry, 0, len(maxBlobs))
+	for _, epoch := range offsets[1:] {
+		schedule = append(schedule, params.BlobScheduleEntry{Epoch: epoch, MaxBlobsPerBlock: maxBlobs[epoch]})
+	}
+	cfg.BlobSchedule = schedule
+	cfg.InitializeForkSchedule()
+	for i := 1; i < len(cfg.BlobSchedule); i++ {
+		beforeEpoch, epoch := cfg.BlobSchedule[i-1].Epoch, cfg.BlobSchedule[i].Epoch
+		before, after := maxBlobs[beforeEpoch], maxBlobs[epoch]
+		require.Equal(t, before, uint64(cfg.MaxBlobsPerBlockAtEpoch(epoch-1)))
+		require.Equal(t, after, uint64(cfg.MaxBlobsPerBlockAtEpoch(epoch)))
+		beforeSlot, err := cfg.SlotsPerEpoch.SafeMul(uint64(beforeEpoch))
+		require.NoError(t, err)
+		afterSlot, err := cfg.SlotsPerEpoch.SafeMul(uint64(epoch))
+		require.NoError(t, err)
+		require.Equal(t, before, uint64(cfg.MaxBlobsPerBlock(beforeSlot)))
+		require.Equal(t, after, uint64(cfg.MaxBlobsPerBlock(afterSlot)))
+	}
+
+	require.Equal(t, electraMaxBlobs, uint64(cfg.MaxBlobsPerBlockAtEpoch(cfg.FuluForkEpoch-1)))
+	require.Equal(t, electraMaxBlobs, uint64(cfg.MaxBlobsPerBlockAtEpoch(cfg.ElectraForkEpoch)))
+	require.Equal(t, cfg.DeprecatedMaxBlobsPerBlock, cfg.MaxBlobsPerBlockAtEpoch(cfg.ElectraForkEpoch-1))
+	require.Equal(t, cfg.DeprecatedMaxBlobsPerBlock, cfg.MaxBlobsPerBlockAtEpoch(cfg.DenebForkEpoch))
+	preBlobEpochs := []primitives.Epoch{cfg.DenebForkEpoch - 1, cfg.CapellaForkEpoch, cfg.BellatrixForkEpoch, cfg.AltairForkEpoch, 0}
+	for _, epoch := range preBlobEpochs {
+		require.Equal(t, 0, cfg.MaxBlobsPerBlockAtEpoch(epoch))
+	}
+}
 func Test_TargetBlobCount(t *testing.T) {
 	cfg := params.MainnetConfig()
 	cfg.ElectraForkEpoch = 10
