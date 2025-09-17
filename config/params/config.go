@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
-	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -699,52 +698,12 @@ func (b *BeaconChainConfig) TargetBlobsPerBlock(slot primitives.Slot) int {
 // MaxBlobsPerBlock returns the maximum number of blobs per block for the given slot.
 func (b *BeaconChainConfig) MaxBlobsPerBlock(slot primitives.Slot) int {
 	epoch := primitives.Epoch(slot.DivSlot(b.SlotsPerEpoch))
-
-	if len(b.BlobSchedule) > 0 {
-		if !slices.IsSortedFunc(b.BlobSchedule, func(a, b BlobScheduleEntry) int {
-			return int(a.Epoch - b.Epoch)
-		}) {
-			slices.SortFunc(b.BlobSchedule, func(a, b BlobScheduleEntry) int {
-				return int(a.Epoch - b.Epoch)
-			})
-		}
-
-		for i := len(b.BlobSchedule) - 1; i >= 0; i-- {
-			if epoch >= b.BlobSchedule[i].Epoch {
-				return int(b.BlobSchedule[i].MaxBlobsPerBlock)
-			}
-		}
-	}
-
-	if epoch >= b.ElectraForkEpoch {
-		return b.DeprecatedMaxBlobsPerBlockElectra
-	}
-
-	return b.DeprecatedMaxBlobsPerBlock
+	return b.MaxBlobsPerBlockAtEpoch(epoch)
 }
 
 // MaxBlobsPerBlockAtEpoch returns the maximum number of blobs per block for the given epoch
 func (b *BeaconChainConfig) MaxBlobsPerBlockAtEpoch(epoch primitives.Epoch) int {
-	if len(b.BlobSchedule) > 0 {
-		if !slices.IsSortedFunc(b.BlobSchedule, func(a, b BlobScheduleEntry) int {
-			return int(a.Epoch - b.Epoch)
-		}) {
-			slices.SortFunc(b.BlobSchedule, func(a, b BlobScheduleEntry) int {
-				return int(a.Epoch - b.Epoch)
-			})
-		}
-
-		for i := len(b.BlobSchedule) - 1; i >= 0; i-- {
-			if epoch >= b.BlobSchedule[i].Epoch {
-				return int(b.BlobSchedule[i].MaxBlobsPerBlock)
-			}
-		}
-	}
-
-	if epoch >= b.ElectraForkEpoch {
-		return b.DeprecatedMaxBlobsPerBlockElectra
-	}
-	return b.DeprecatedMaxBlobsPerBlock
+	return int(b.networkSchedule.ForEpoch(epoch).MaxBlobsPerBlock)
 }
 
 // DenebEnabled centralizes the check to determine if code paths that are specific to deneb should be allowed to execute.
