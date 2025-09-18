@@ -1103,6 +1103,13 @@ func TestCountCommitments(t *testing.T) {
 }
 
 func TestCommitmentCountList(t *testing.T) {
+	de := params.BeaconConfig().DenebForkEpoch
+	ds, err := slots.EpochStart(de)
+	require.NoError(t, err)
+	denebRel := func(s primitives.Slot) primitives.Slot {
+		return ds + s
+	}
+	maxBlobs := params.BeaconConfig().MaxBlobsPerBlock(ds)
 	cases := []struct {
 		name     string
 		cc       commitmentCountList
@@ -1119,20 +1126,20 @@ func TestCommitmentCountList(t *testing.T) {
 		{
 			name: "nil bss, single slot",
 			cc: []commitmentCount{
-				{slot: 11235, count: 1},
+				{slot: denebRel(11235), count: 1},
 			},
-			expected: &blobRange{low: 11235, high: 11235},
-			request:  &ethpb.BlobSidecarsByRangeRequest{StartSlot: 11235, Count: 1},
+			expected: &blobRange{low: denebRel(11235), high: denebRel(11235)},
+			request:  &ethpb.BlobSidecarsByRangeRequest{StartSlot: denebRel(11235), Count: 1},
 		},
 		{
 			name: "nil bss, sparse slots",
 			cc: []commitmentCount{
-				{slot: 11235, count: 1},
-				{slot: 11240, count: params.BeaconConfig().MaxBlobsPerBlock(0)},
-				{slot: 11250, count: 3},
+				{slot: denebRel(11235), count: 1},
+				{slot: denebRel(11240), count: maxBlobs},
+				{slot: denebRel(11250), count: 3},
 			},
-			expected: &blobRange{low: 11235, high: 11250},
-			request:  &ethpb.BlobSidecarsByRangeRequest{StartSlot: 11235, Count: 16},
+			expected: &blobRange{low: denebRel(11235), high: denebRel(11250)},
+			request:  &ethpb.BlobSidecarsByRangeRequest{StartSlot: denebRel(11235), Count: 16},
 		},
 		{
 			name: "AllAvailable in middle, some avail low, none high",
@@ -1141,15 +1148,15 @@ func TestCommitmentCountList(t *testing.T) {
 					bytesutil.ToBytes32([]byte("0")): {0, 1},
 					bytesutil.ToBytes32([]byte("1")): {0, 1, 2, 3, 4, 5},
 				}
-				return filesystem.NewMockBlobStorageSummarizer(t, onDisk)
+				return filesystem.NewMockBlobStorageSummarizer(t, de, onDisk)
 			},
 			cc: []commitmentCount{
-				{slot: 0, count: 3, root: bytesutil.ToBytes32([]byte("0"))},
-				{slot: 5, count: params.BeaconConfig().MaxBlobsPerBlock(0), root: bytesutil.ToBytes32([]byte("1"))},
-				{slot: 15, count: 3},
+				{slot: denebRel(0), count: 3, root: bytesutil.ToBytes32([]byte("0"))},
+				{slot: denebRel(5), count: maxBlobs, root: bytesutil.ToBytes32([]byte("1"))},
+				{slot: denebRel(15), count: 3},
 			},
-			expected: &blobRange{low: 0, high: 15},
-			request:  &ethpb.BlobSidecarsByRangeRequest{StartSlot: 0, Count: 16},
+			expected: &blobRange{low: denebRel(0), high: denebRel(15)},
+			request:  &ethpb.BlobSidecarsByRangeRequest{StartSlot: denebRel(0), Count: 16},
 		},
 		{
 			name: "AllAvailable at high and low",
@@ -1158,15 +1165,15 @@ func TestCommitmentCountList(t *testing.T) {
 					bytesutil.ToBytes32([]byte("0")): {0, 1},
 					bytesutil.ToBytes32([]byte("2")): {0, 1, 2, 3, 4, 5},
 				}
-				return filesystem.NewMockBlobStorageSummarizer(t, onDisk)
+				return filesystem.NewMockBlobStorageSummarizer(t, de, onDisk)
 			},
 			cc: []commitmentCount{
-				{slot: 0, count: 2, root: bytesutil.ToBytes32([]byte("0"))},
-				{slot: 5, count: 3},
-				{slot: 15, count: params.BeaconConfig().MaxBlobsPerBlock(0), root: bytesutil.ToBytes32([]byte("2"))},
+				{slot: denebRel(0), count: 2, root: bytesutil.ToBytes32([]byte("0"))},
+				{slot: denebRel(5), count: 3},
+				{slot: denebRel(15), count: maxBlobs, root: bytesutil.ToBytes32([]byte("2"))},
 			},
-			expected: &blobRange{low: 5, high: 5},
-			request:  &ethpb.BlobSidecarsByRangeRequest{StartSlot: 5, Count: 1},
+			expected: &blobRange{low: denebRel(5), high: denebRel(5)},
+			request:  &ethpb.BlobSidecarsByRangeRequest{StartSlot: denebRel(5), Count: 1},
 		},
 		{
 			name: "AllAvailable at high and low, adjacent range in middle",
@@ -1175,16 +1182,16 @@ func TestCommitmentCountList(t *testing.T) {
 					bytesutil.ToBytes32([]byte("0")): {0, 1},
 					bytesutil.ToBytes32([]byte("2")): {0, 1, 2, 3, 4, 5},
 				}
-				return filesystem.NewMockBlobStorageSummarizer(t, onDisk)
+				return filesystem.NewMockBlobStorageSummarizer(t, de, onDisk)
 			},
 			cc: []commitmentCount{
-				{slot: 0, count: 2, root: bytesutil.ToBytes32([]byte("0"))},
-				{slot: 5, count: 3},
-				{slot: 6, count: 3},
-				{slot: 15, count: params.BeaconConfig().MaxBlobsPerBlock(0), root: bytesutil.ToBytes32([]byte("2"))},
+				{slot: denebRel(0), count: 2, root: bytesutil.ToBytes32([]byte("0"))},
+				{slot: denebRel(5), count: 3},
+				{slot: denebRel(6), count: 3},
+				{slot: denebRel(15), count: maxBlobs, root: bytesutil.ToBytes32([]byte("2"))},
 			},
-			expected: &blobRange{low: 5, high: 6},
-			request:  &ethpb.BlobSidecarsByRangeRequest{StartSlot: 5, Count: 2},
+			expected: &blobRange{low: denebRel(5), high: denebRel(6)},
+			request:  &ethpb.BlobSidecarsByRangeRequest{StartSlot: denebRel(5), Count: 2},
 		},
 		{
 			name: "AllAvailable at high and low, range in middle",
@@ -1194,16 +1201,16 @@ func TestCommitmentCountList(t *testing.T) {
 					bytesutil.ToBytes32([]byte("1")): {0, 1},
 					bytesutil.ToBytes32([]byte("2")): {0, 1, 2, 3, 4, 5},
 				}
-				return filesystem.NewMockBlobStorageSummarizer(t, onDisk)
+				return filesystem.NewMockBlobStorageSummarizer(t, de, onDisk)
 			},
 			cc: []commitmentCount{
-				{slot: 0, count: 2, root: bytesutil.ToBytes32([]byte("0"))},
-				{slot: 5, count: 3, root: bytesutil.ToBytes32([]byte("1"))},
-				{slot: 10, count: 3},
-				{slot: 15, count: params.BeaconConfig().MaxBlobsPerBlock(0), root: bytesutil.ToBytes32([]byte("2"))},
+				{slot: denebRel(0), count: 2, root: bytesutil.ToBytes32([]byte("0"))},
+				{slot: denebRel(5), count: 3, root: bytesutil.ToBytes32([]byte("1"))},
+				{slot: denebRel(10), count: 3},
+				{slot: denebRel(15), count: maxBlobs, root: bytesutil.ToBytes32([]byte("2"))},
 			},
-			expected: &blobRange{low: 5, high: 10},
-			request:  &ethpb.BlobSidecarsByRangeRequest{StartSlot: 5, Count: 6},
+			expected: &blobRange{low: denebRel(5), high: denebRel(10)},
+			request:  &ethpb.BlobSidecarsByRangeRequest{StartSlot: denebRel(5), Count: 6},
 		},
 	}
 	for _, c := range cases {
@@ -1218,8 +1225,8 @@ func TestCommitmentCountList(t *testing.T) {
 				require.IsNil(t, br.Request())
 			} else {
 				req := br.Request()
-				require.DeepEqual(t, req.StartSlot, c.request.StartSlot)
-				require.DeepEqual(t, req.Count, c.request.Count)
+				require.Equal(t, req.StartSlot, c.request.StartSlot)
+				require.Equal(t, req.Count, c.request.Count)
 			}
 		})
 	}
@@ -1299,7 +1306,7 @@ func TestVerifyAndPopulateBlobs(t *testing.T) {
 			r1: {0, 1},
 			r7: {0, 1, 2, 3, 4, 5},
 		}
-		bss := filesystem.NewMockBlobStorageSummarizer(t, onDisk)
+		bss := filesystem.NewMockBlobStorageSummarizer(t, params.BeaconConfig().DenebForkEpoch, onDisk)
 		err := verifyAndPopulateBlobs(bwb, blobs, testReqFromResp(bwb), bss)
 		require.NoError(t, err)
 		require.Equal(t, 6, len(bwb[i1].Blobs))

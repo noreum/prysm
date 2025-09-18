@@ -4,9 +4,11 @@ import (
 	"testing"
 
 	"github.com/OffchainLabs/prysm/v6/beacon-chain/p2p"
+	"github.com/OffchainLabs/prysm/v6/beacon-chain/startup"
 	"github.com/OffchainLabs/prysm/v6/config/params"
 	"github.com/OffchainLabs/prysm/v6/consensus-types/blocks"
 	types "github.com/OffchainLabs/prysm/v6/consensus-types/primitives"
+	"github.com/OffchainLabs/prysm/v6/genesis"
 	ethpb "github.com/OffchainLabs/prysm/v6/proto/prysm/v1alpha1"
 	"github.com/OffchainLabs/prysm/v6/testing/require"
 	"github.com/OffchainLabs/prysm/v6/time/slots"
@@ -89,15 +91,12 @@ func (c *blobsTestCase) runTestBlobSidecarsByRange(t *testing.T) {
 }
 
 func TestBlobByRangeOK(t *testing.T) {
-	origNC := params.BeaconConfig()
-	// restore network config after test completes
-	defer func() {
-		params.OverrideBeaconConfig(origNC)
-	}()
-	// set MaxRequestBlobSidecars to a low-ish value so the test doesn't timeout.
+	params.SetupTestConfigCleanup(t)
 	nc := params.BeaconConfig().Copy()
 	nc.MaxRequestBlobSidecars = 100
 	params.OverrideBeaconConfig(nc)
+	ds, err := slots.EpochStart(params.BeaconConfig().DenebForkEpoch)
+	require.NoError(t, err)
 
 	cases := []*blobsTestCase{
 		{
@@ -134,7 +133,7 @@ func TestBlobByRangeOK(t *testing.T) {
 					Count:     20,
 				}
 			},
-			total: func() *int { x := params.BeaconConfig().MaxBlobsPerBlock(0) * 10; return &x }(), // 10 blocks * 4 blobs = 40
+			total: func() *int { x := params.BeaconConfig().MaxBlobsPerBlock(ds) * 10; return &x }(), // 10 blocks * 4 blobs = 40
 		},
 		{
 			name:    "when request count > MAX_REQUEST_BLOCKS_DENEB, MAX_REQUEST_BLOBS_SIDECARS sidecars in response",
@@ -148,7 +147,9 @@ func TestBlobByRangeOK(t *testing.T) {
 			total: func() *int { x := int(params.BeaconConfig().MaxRequestBlobSidecars); return &x }(),
 		},
 	}
+	clock := startup.NewClock(genesis.Time(), genesis.ValidatorsRoot(), startup.WithSlotAsNow(ds))
 	for _, c := range cases {
+		c.clock = clock
 		t.Run(c.name, func(t *testing.T) {
 			c.runTestBlobSidecarsByRange(t)
 		})

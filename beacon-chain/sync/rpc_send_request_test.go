@@ -614,18 +614,20 @@ func TestBlobValidatorFromRangeReq(t *testing.T) {
 }
 
 func TestSeqBlobValid(t *testing.T) {
-	one, oneBlobs := generateTestBlockWithSidecars(t, [32]byte{}, 0, 3)
+	ds, err := slots.EpochStart(params.BeaconConfig().DenebForkEpoch)
+	require.NoError(t, err)
+	one, oneBlobs := generateTestBlockWithSidecars(t, [32]byte{}, ds, 3)
 	r1, err := one.Block.HashTreeRoot()
 	require.NoError(t, err)
-	two, twoBlobs := generateTestBlockWithSidecars(t, r1, 1, 3)
+	two, twoBlobs := generateTestBlockWithSidecars(t, r1, ds+1, 3)
 	r2, err := two.Block.HashTreeRoot()
 	require.NoError(t, err)
-	_, oops := generateTestBlockWithSidecars(t, r2, 0, 4)
+	_, oops := generateTestBlockWithSidecars(t, r2, ds, 4)
 	oops[1].SignedBlockHeader.Header.ParentRoot = bytesutil.PadTo([]byte("derp"), 32)
 	wrongRoot, err := blocks.NewROBlobWithRoot(oops[2].BlobSidecar, bytesutil.ToBytes32([]byte("parentderp")))
 	require.NoError(t, err)
 	oob := oops[3]
-	oob.Index = uint64(params.BeaconConfig().MaxBlobsPerBlock(0))
+	oob.Index = uint64(params.BeaconConfig().MaxBlobsPerBlock(ds))
 
 	cases := []struct {
 		name  string

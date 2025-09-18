@@ -2413,6 +2413,9 @@ func driftGenesisTime(s *Service, slot primitives.Slot, delay time.Duration) {
 }
 
 func TestMissingBlobIndices(t *testing.T) {
+	ds, err := slots.EpochStart(params.BeaconConfig().DenebForkEpoch)
+	require.NoError(t, err)
+	maxBlobs := params.BeaconConfig().MaxBlobsPerBlock(ds)
 	cases := []struct {
 		name     string
 		expected [][]byte
@@ -2426,23 +2429,23 @@ func TestMissingBlobIndices(t *testing.T) {
 		},
 		{
 			name:     "expected exceeds max",
-			expected: fakeCommitments(params.BeaconConfig().MaxBlobsPerBlock(0) + 1),
+			expected: fakeCommitments(maxBlobs + 1),
 			err:      errMaxBlobsExceeded,
 		},
 		{
 			name:     "first missing",
-			expected: fakeCommitments(params.BeaconConfig().MaxBlobsPerBlock(0)),
+			expected: fakeCommitments(maxBlobs),
 			present:  []uint64{1, 2, 3, 4, 5},
 			result:   fakeResult([]uint64{0}),
 		},
 		{
 			name:     "all missing",
-			expected: fakeCommitments(params.BeaconConfig().MaxBlobsPerBlock(0)),
+			expected: fakeCommitments(maxBlobs),
 			result:   fakeResult([]uint64{0, 1, 2, 3, 4, 5}),
 		},
 		{
 			name:     "none missing",
-			expected: fakeCommitments(params.BeaconConfig().MaxBlobsPerBlock(0)),
+			expected: fakeCommitments(maxBlobs),
 			present:  []uint64{0, 1, 2, 3, 4, 5},
 			result:   fakeResult([]uint64{}),
 		},
@@ -2475,8 +2478,8 @@ func TestMissingBlobIndices(t *testing.T) {
 	for _, c := range cases {
 		bm, bs := filesystem.NewEphemeralBlobStorageWithMocker(t)
 		t.Run(c.name, func(t *testing.T) {
-			require.NoError(t, bm.CreateFakeIndices(c.root, 0, c.present...))
-			missing, err := missingBlobIndices(bs, c.root, c.expected, 0)
+			require.NoError(t, bm.CreateFakeIndices(c.root, ds, c.present...))
+			missing, err := missingBlobIndices(bs, c.root, c.expected, ds)
 			if c.err != nil {
 				require.ErrorIs(t, err, c.err)
 				return

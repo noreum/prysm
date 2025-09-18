@@ -193,6 +193,7 @@ func TestBlobsByRootValidation(t *testing.T) {
 	dmc, clock := defaultMockChain(t)
 	dmc.Slot = &capellaSlot
 	dmc.FinalizedCheckPoint = &ethpb.Checkpoint{Epoch: params.BeaconConfig().CapellaForkEpoch}
+	maxBlobs := params.BeaconConfig().MaxBlobsPerBlockAtEpoch(params.BeaconConfig().DenebForkEpoch)
 	cases := []*blobsTestCase{
 		{
 			name:    "block before minimum_request_epoch",
@@ -222,7 +223,7 @@ func TestBlobsByRootValidation(t *testing.T) {
 			name:    "block with all indices missing between 2 full blocks",
 			nblocks: 3,
 			missing: map[int]bool{1: true},
-			total:   func(i int) *int { return &i }(2 * int(params.BeaconConfig().MaxBlobsPerBlock(0))),
+			total:   func(i int) *int { return &i }(2 * int(maxBlobs)),
 		},
 		{
 			name:    "exceeds req max",

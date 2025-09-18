@@ -20,8 +20,16 @@ import (
 	"github.com/spf13/afero"
 )
 
+func denebSlotEpoch(t *testing.T) (primitives.Slot, primitives.Epoch) {
+	e := params.BeaconConfig().DenebForkEpoch
+	s, err := slots.EpochStart(e)
+	require.NoError(t, err)
+	return s, e
+}
+
 func TestBlobStorage_SaveBlobData(t *testing.T) {
-	_, sidecars := util.GenerateTestDenebBlockWithSidecar(t, [32]byte{}, 1, params.BeaconConfig().MaxBlobsPerBlock(1))
+	ds, _ := denebSlotEpoch(t)
+	_, sidecars := util.GenerateTestDenebBlockWithSidecar(t, [32]byte{}, ds, params.BeaconConfig().MaxBlobsPerBlock(ds))
 	testSidecars := verification.FakeVerifySliceForTest(t, sidecars)
 
 	t.Run("no error for duplicate", func(t *testing.T) {

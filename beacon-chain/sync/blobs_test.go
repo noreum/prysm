@@ -174,7 +174,7 @@ func (c *blobsTestCase) setup(t *testing.T) (*Service, []blocks.ROBlob, func()) 
 	cleanup := func() {
 		params.OverrideBeaconConfig(cfg)
 	}
-	maxBlobs := int(params.BeaconConfig().MaxBlobsPerBlock(0))
+	maxBlobs := int(params.BeaconConfig().MaxBlobsPerBlockAtEpoch(params.BeaconConfig().DenebForkEpoch))
 	chain, clock := defaultMockChain(t)
 	if c.chain == nil {
 		c.chain = chain
